@@ -279,6 +279,54 @@ namespace OpenTap.Plugins.PNAX
             return resultsList;
         }
 
+        /// <summary>
+        /// Reads a measurement as a two-dimensional trace of its formatted data against frequency.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// The measurement's display format returns more than one value per point (e.g. Smith or polar).
+        /// </exception>
+        public ChuckPlugins.TraceUtilities.Trace GetTrace(int Channel, int mnum)
+        {
+            List<List<string>> data = StoreTraceData(Channel, mnum);
+            WaitForOperationComplete();
+
+            List<double> x = ParseTraceValues(data[0]);
+            List<double> y = ParseTraceValues(data[1]);
+
+            if (y.Count != x.Count)
+            {
+                throw new InvalidOperationException(
+                    $"Channel {Channel} measurement {mnum} returned {y.Count} Y values for {x.Count} X values. " +
+                    "Only formats with one value per point (e.g. log magnitude, phase) can be read as a trace.");
+            }
+
+            string measurementName = GetTraceName(Channel, mnum);
+
+            var trace = new ChuckPlugins.TraceUtilities.Trace
+            {
+                Name = measurementName,
+                Timestamp = DateTime.UtcNow,
+                XLabel = "Frequency",
+                XUnit = "Hz",
+                YLabel = measurementName,
+                X = x,
+                Y = y,
+            };
+            trace.Metadata["Instrument"] = Name;
+            trace.Metadata["Channel"] = Channel.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            trace.Metadata["MNum"] = mnum.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            trace.Validate();
+            return trace;
+        }
+
+        private static List<double> ParseTraceValues(List<string> values)
+        {
+            return values
+                .Select(v => double.Parse(v, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture))
+                .ToList();
+        }
+
         public string GetTraceName(int Channel, int mnum)
         {
             string retVal = "undefined trace";

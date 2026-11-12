@@ -1,13 +1,16 @@
+using ChuckPlugins.TraceUtilities;
 using OpenTap;
-using System.Collections.Generic;
-using System.Linq;
+using System;
+using System.ComponentModel;
+using System.Xml.Serialization;
 
 namespace OpenTap.Plugins.PNAX.LMS
 {
-    [Display("Get Single Trace", Groups: new[] { "Network Analyzer", "Load/Measure/Store" }, Description: "Reads a single trace from the PNA. The data is not stored or published yet.")]
-    public class GetSingleTrace : TestStep
+    [Display("Get Single Trace", Groups: [ "Network Analyzer", "Load/Measure/Store" ], Description: "Reads a single trace from the PNA. The data is not stored or published yet.")]
+    public class GetSingleTrace : TestStep, ITraceGenerator
     {
         #region Settings
+
         [Display("PNA", Order: 0.1)]
         public PNAX PNAX { get; set; }
 
@@ -16,7 +19,12 @@ namespace OpenTap.Plugins.PNAX.LMS
 
         [Display("MNum", Description: "Measurement number of the trace.", Group: "Trace", Order: 2)]
         public int MNum { get; set; }
+
         #endregion
+
+        [Browsable(false)]
+        [XmlIgnore]
+        public Trace GeneratedTrace { get; set; }
 
         public GetSingleTrace()
         {
@@ -27,16 +35,9 @@ namespace OpenTap.Plugins.PNAX.LMS
         public override void Run()
         {
             UpgradeVerdict(Verdict.NotSet);
+            GeneratedTrace = null;
 
-            // Index 0 is the X values, index 1 is the Y values (two values per point for complex formats).
-            List<List<string>> data = PNAX.StoreTraceData(Channel, MNum);
-            PNAX.WaitForOperationComplete();
-
-            double[] x = data[0].Select(double.Parse).ToArray();
-            double[] y = data[1].Select(double.Parse).ToArray();
-
-            // Intentionally does nothing further with the trace for now.
-            Log.Info($"Read trace from channel {Channel}, mnum {MNum}: {x.Length} X values, {y.Length} Y values.");
+            GeneratedTrace = PNAX.GetTrace(Channel, MNum);
 
             UpgradeVerdict(Verdict.Pass);
         }
